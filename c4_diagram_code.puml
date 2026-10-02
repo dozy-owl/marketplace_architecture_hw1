@@ -1,0 +1,55 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+Person(buyer, "Покупатель", "Ищет товары, делает заказы.")
+Person(seller, "Продавец", "Добавляет свои товары, принимает заказы.")
+
+System_Boundary(marketplace, "Маркетплейс") {
+    Container(api_gw, "API Gateway", "Nginx", "Единая точка входа, маршрутизация, SSL")
+    
+    Container(payments_internal, "Платёжный сервис", "Python", "Расчёт и учёт платежей")
+    Container(catalog, "Каталог товаров", "Python", "Каталог товаров, взаимодействие с товаром продавцом")
+    Container(user_service, "Пользовательский сервис", "Python", "Аутентификация, профиль покупателя/продавца")
+    Container(cart, "Корзина", "Python", "Управление корзинами покупателей")
+    Container(search, "Поиск", "Python", "Поиск и персонализированная лента")
+    Container(oms, "Заказы (OMS)", "Python", "Оформление заказа, трекинг статуса")
+    Container(alarm, "Уведомления", "Python", "Отправка уведомления о смене статуса заказа")
+
+    SystemDb(payments_db, "БД платежей", "Таблицы: transactions")
+    SystemDb(catalog_db, "БД каталога", "Таблицы: products, categories")
+    SystemDb(user_db, "БД пользователей", "Таблицы: users, roles, profiles")
+    SystemDb(cart_db, "БД корзины", "Временные ключ-значение данных корзины")
+    SystemDb(search_db, "Индекс поиска", "Индексы для быстрого поиска и фильтрации")
+    SystemDb(oms_db, "БД заказов", "Таблицы: orders, order_status")
+
+    System_Ext(message_broker, "Message Broker", "Асинхронная передача событий между сервисами")
+}
+
+System_Ext(payments_gateway, "Платёжный шлюз", "Обработка реальных платежей",  "Внешний API")
+
+
+Rel(buyer, api_gw, "Просматривает, ищет и покупает", "HTTPS")
+Rel(seller, api_gw, "Управляет товарами", "HTTPS")
+
+Rel(api_gw, catalog, "Управление товарами", "HTTP REST")
+Rel(api_gw, search, "Поиск и персонализированная лента", "HTTP REST")
+Rel(api_gw, oms, "Взаимодействие с заказами (оформление, отмена)", "HTTP REST")
+Rel(api_gw, user_service, "Авторизация, профиль", "HTTP REST")
+Rel(api_gw, cart, "Корзина (добавление, удаление)", "HTTP REST")
+
+Rel(oms, payments_internal, "Запрос на оплату заказа", "HTTP REST")
+Rel(oms, message_broker, "Уведомляет об изменении статуса заказа", "Async")
+Rel(message_broker, alarm, "Получает уведомление об изменении статуса заказа", "Async")
+Rel(catalog, message_broker, "Уведомляет о добавлении товара", "Async")
+Rel(message_broker, search, "Получает уведомление о добавлении товара", "Async")
+Rel(payments_internal, message_broker, "Уведомляет об оплате заказа", "Async")
+Rel(message_broker, oms, "Получает уведомление о совершении успешной оплаты", "Async")
+Rel(payments_internal, payments_gateway, "Производит платёжную операцию", "HTTPS")
+
+Rel(search, search_db, "Читает индексы", "HTTP")
+Rel(user_service, user_db, "Чтение и запись информации о пользователе", "SQL")
+Rel(cart, cart_db, "Чтение и запись информации о товарах в корзине", "SQL")
+Rel(oms, oms_db, "Чтение и запись информации о заказах", "SQL")
+Rel(payments_internal, payments_db, "Чтение и запись информации о платежах", "SQL")
+Rel(catalog, catalog_db, "Чтение и запись информации о товарах в каталоге", "SQL")
+@enduml
